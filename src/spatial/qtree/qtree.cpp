@@ -4,7 +4,8 @@ using namespace l_systems;
 using namespace l_systems::spatial;
 using namespace godot;
 
-QTree::QTree() {
+QTree::QTree(Rect2i p_bounds) : bounds(p_bounds) {
+    bounds = p_bounds;
     nodes.push_back(QNode()); // Start with a root node
 }
 
@@ -12,7 +13,7 @@ QTree::~QTree() {
 }
 
 void QTree::insert(const QCell &cell) {
-    // Implementation of insert function
+    
 
 }
 

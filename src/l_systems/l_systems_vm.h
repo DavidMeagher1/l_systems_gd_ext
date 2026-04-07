@@ -38,6 +38,12 @@ namespace l_systems {
         "v"
     };
 
+    static const char *structural_action_glyphs[] = {
+        "F",
+        "^",
+        "v"
+    };
+
     class LSystemVM {
         public:
             LSystemVM();
@@ -63,6 +69,10 @@ namespace l_systems {
             void set_length(float p_length);
             PackedByteArray generate();
 
+            int get_structural_action_count() const {
+                return structural_action_count;
+            }
+
         private:
             // Add private members and methods here
             TypedDictionary<String,String> rules;
@@ -71,6 +81,8 @@ namespace l_systems {
             float angle = 0.0f;
             float length = 0.0f;
             Mode mode = MODE_2D;
+            // this allows us to track how many structural actions are in the generated string, which can be useful for optimizations in the rendering phase
+            int structural_action_count = 0;
             String iterate();
     };
 }

@@ -35,8 +35,9 @@ namespace l_systems::spatial {
 
     class QTree {
         public:
-            QTree();
+            QTree(godot::Rect2i p_bounds);
             ~QTree();
+            godot::Rect2i bounds;
             std::vector<QNode> nodes;
 
             void insert(const QCell &cell);

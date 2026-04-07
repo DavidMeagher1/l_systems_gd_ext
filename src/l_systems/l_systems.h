@@ -1,6 +1,7 @@
 #pragma once
 #include <godot_cpp/classes/resource.hpp>
 #include "l_systems_vm.h"
+#include "../spatial/qtree/qtree.h"
 
 namespace l_systems{
     using namespace godot;
@@ -8,6 +9,12 @@ namespace l_systems{
         GDCLASS(LSystem, Resource);
 
         public:
+
+            struct GenerationResult {
+                std::vector<spatial::QCell> cells;
+                Rect2i bounds;
+            };
+
             LSystem();
             ~LSystem();
 
@@ -30,6 +37,10 @@ namespace l_systems{
             void set_length(float p_length);
 
             PackedByteArray get_byte_code();
+
+            int get_structural_action_count() const;
+
+            GenerationResult generate();
         
         private:
             LSystemVM vm;
