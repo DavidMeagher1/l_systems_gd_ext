@@ -1,6 +1,7 @@
 #include "register_types.h"
 
-#include "l_systems.h"
+#include "types.h"
+#include "./l_systems/l_systems.h"
 
 #include <gdextension_interface.h>
 #include <godot_cpp/core/defs.hpp>
