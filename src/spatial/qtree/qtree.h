@@ -1,7 +1,7 @@
 
 #pragma once
 
-#include "../types.h"
+#include "../../types.h"
 #include <vector>
 #include <godot_cpp/variant/vector2i.hpp>
 #include <godot_cpp/variant/rect2i.hpp>
