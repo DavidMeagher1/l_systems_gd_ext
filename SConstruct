@@ -11,11 +11,17 @@ env = SConscript("godot-cpp/SConstruct")
 # Configures the 'src' directory as a source for header files.
 env.Append(CPPPATH=["src/"])
 
-# Collects all .cpp files in the 'src' folder as compile targets, excluding gen directory.
-sources = Glob("src/*.cpp") + Glob("src/**/*.cpp", exclude="src/gen/*")
-
-# Collect XML files from doc_classes directory and subdirectories for documentation
-doc_data = env.GodotCPPDocData("src/gen/doc_data.gen.cpp", source=Glob("doc_classes/*.xml") + Glob("doc_classes/**/*.xml"))
+# Source files for the extension.
+sources = [
+    "src/register_types.cpp",
+    "src/l_systems/l_systems.cpp",
+    "src/l_systems/l_systems_vm.cpp",
+    "src/spatial/qtree/qtree.cpp",
+]
+# XML doc class files for documentation generation.
+doc_data = env.GodotCPPDocData("src/gen/doc_data.gen.cpp", source=[
+    "doc_classes/LSystem.xml",
+])
 sources.append(doc_data)
 
 # The filename for the dynamic library for this GDExtension.
