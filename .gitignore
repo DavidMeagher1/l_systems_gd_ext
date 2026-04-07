@@ -1,3 +1,4 @@
 project/l-system-test/
 .sconsign.*
 bin/
+*.obj
