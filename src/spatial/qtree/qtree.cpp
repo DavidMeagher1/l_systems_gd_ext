@@ -1,30 +1,30 @@
-#include "quad_tree.h"
+#include "qtree.h"
 
 using namespace l_systems;
 using namespace l_systems::spatial;
 using namespace godot;
 
-Tree::Tree() {
-    nodes.push_back(Node()); // Start with a root node
+QTree::QTree() {
+    nodes.push_back(QNode()); // Start with a root node
 }
 
-Tree::~Tree() {
+QTree::~QTree() {
 }
 
-void Tree::insert(const Cell &cell) {
+void QTree::insert(const QCell &cell) {
     // Implementation of insert function
 
 }
 
-void Tree::subdivide(unsigned int node_index) {
+void QTree::subdivide(unsigned int node_index) {
     // Implementation of subdivide function
 
 }
 
-Rect2i Tree::get_bounds() {
+godot::Rect2i QTree::get_bounds() {
     // Implementation of get_bounds function
-    Node nw_cell = nodes[0];
-    Node se_cell = nodes[0];
+    QNode nw_cell = nodes[0];
+    QNode se_cell = nodes[0];
     int min_x = nw_cell.data.x;
     int max_x = se_cell.data.x;
     int min_y = nw_cell.data.y;
@@ -40,12 +40,12 @@ Rect2i Tree::get_bounds() {
     return Rect2i(Vector2i(min_x, min_y), Vector2i(max_x - min_x, max_y - min_y));
 }
 
-void Tree::clear() {
+void QTree::clear() {
     nodes.clear();
 }
 
-Node::Node() {
+QNode::QNode() {
 }
 
-Node::~Node() {
+QNode::~QNode() {
 }

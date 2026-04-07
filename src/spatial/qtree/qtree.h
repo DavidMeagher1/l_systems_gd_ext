@@ -8,7 +8,7 @@
 
 namespace l_systems{
     namespace spatial {
-        struct Cell {
+        struct QCell {
             int x;
             int y;
             q16norm_t u;
@@ -22,25 +22,25 @@ namespace l_systems{
             SE = 3
         };
 
-        class Node {
+        class QNode {
             public:
-                Node();
-                ~Node();
+                QNode();
+                ~QNode();
 
                 unsigned int parent = 0;
                 
                 unsigned int children[4] = {0, 0, 0, 0};
-                Cell data;
+                QCell data;
             private:
         };
 
-        class Tree {
+        class QTree {
             public:
-                Tree();
-                ~Tree();
-                std::vector<Node> nodes;
+                QTree();
+                ~QTree();
+                std::vector<QNode> nodes;
 
-                void insert(const Cell &cell);
+                void insert(const QCell &cell);
                 void subdivide(unsigned int node_index);
                 godot::Rect2i get_bounds();
                 void clear();
