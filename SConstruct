@@ -11,9 +11,11 @@ env = SConscript("godot-cpp/SConstruct")
 # Configures the 'src' directory as a source for header files.
 env.Append(CPPPATH=["src/"])
 
-# Collects all .cpp files in the 'src' folder as compile targets.
-sources = Glob("src/*.cpp")
-doc_data = env.GodotCPPDocData("src/gen/doc_data.gen.cpp", source=Glob("doc_classes/*.xml"))
+# Collects all .cpp files in the 'src' folder as compile targets, excluding gen directory.
+sources = Glob("src/*.cpp") + Glob("src/**/*.cpp", exclude="src/gen/*")
+
+# Collect XML files from doc_classes directory and subdirectories for documentation
+doc_data = env.GodotCPPDocData("src/gen/doc_data.gen.cpp", source=Glob("doc_classes/*.xml") + Glob("doc_classes/**/*.xml"))
 sources.append(doc_data)
 
 # The filename for the dynamic library for this GDExtension.
@@ -34,5 +36,6 @@ library = env.SharedLibrary(
 addon_bin = "project/l-system-test/addons/l_systems/bin"
 addon_library = env.Install(addon_bin, library)
 
+#NOTE: REMOVE ADDON_LIBRARY AFTER TESTING. THIS IS ONLY FOR CONVENIENCE TO AVOID MANUALLY COPYING THE BUILT LIBRARY INTO THE TEST PROJECT.
 # Selects the shared library as the default target.
 Default([library, addon_library])
