@@ -1,6 +1,6 @@
 #pragma once
 #include <godot_cpp/classes/resource.hpp>
-#include "l_system_vm.h"
+#include "l_systems_vm.h"
 
 namespace l_systems{
     using namespace godot;
