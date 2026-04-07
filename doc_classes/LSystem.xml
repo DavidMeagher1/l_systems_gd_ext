@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="LSystem" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		A Resource-backed L-system definition exposed by the extension.
+	</brief_description>
+	<description>
+		[LSystem] is a custom GDExtension class intended to hold L-system data and behavior for use from Godot.
+		Update this file as you add properties, methods, signals, and examples so the editor class reference stays in sync.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+	</methods>
+	<members>
+	</members>
+	<signals>
+	</signals>
+	<constants>
+	</constants>
+</class>
