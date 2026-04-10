@@ -1,19 +1,11 @@
 #include "l_systems.h"
-
+#include "vector.h"
 using namespace l_systems;
 
 LSystem::LSystem() {
 }
 
 LSystem::~LSystem() {
-}
-
-int LSystem::get_mode() {
-    return int(vm.get_mode());
-}
-
-void LSystem::set_mode(int p_mode) {
-    vm.set_mode(Mode(p_mode));
 }
 
 
@@ -61,87 +53,112 @@ PackedByteArray LSystem::get_byte_code() {
     return vm.generate();
 }
 
-int LSystem::get_structural_action_count() const {
-    return vm.get_structural_action_count();
-}
-
-LSystem::GenerationResult LSystem::generate() {
+template <size_t N>
+LSystem::GenerationResult<N> LSystem::generate_leaf_nodes() {
         struct State {
-            int x;
-            int y;
-            float angle;
+            vec<float, N> position;
+            vec<float, N> direction;
         };
 
         PackedByteArray byte_code = vm.generate();
-        std::vector<spatial::QCell> cells;
-        cells.reserve(get_structural_action_count());
-        int cell_index = 0;
-        int x = 0;
-        int y = 0;
-        int min_x = 0;
-        int max_x = 0;
-        int min_y = 0;
-        int max_y = 0;
-        float angle = 0.0f;
+        spatial::LBH<N> nodes;
+        vec<float, N> lr; // last position
+        vec<float, N> r; // current position
+        vec<float, N> min;
+        vec<float, N> max;
+        vec<float, N> direction;
+        direction[0] = 1.0f;
         std::vector<State> state_stack;
         for (int i = 0; i < byte_code.size(); i++) {
-            spatial::QCell cell;
+            spatial::Node<N> node;
             Opcodes opcode = static_cast<Opcodes>(byte_code[i]);
             switch (opcode){
                 case DONE:
                     break;
                 case MOVE:
-                    x += int(std::round(cos(angle)));
-                    y += int(std::round(sin(angle)));
+                    lr = r;
+                    r += vm.get_length() * direction.normalized();
                     break;
-                case FORWARD:
-                    x += int(std::round(cos(angle)));
-                    y += int(std::round(sin(angle)));
-                    cell.x = x;
-                    cell.y = y;
-                    //TODO
-                    cell.u = 0;
-                    cell.v = 0;
-                    min_x = std::min(min_x, cell.x);
-                    max_x = std::max(max_x, cell.x);
-                    min_y = std::min(min_y, cell.y);
-                    max_y = std::max(max_y, cell.y);
-                    cells[cell_index++] = cell;
+                case FORWARD: {
+                    lr = r;
+                    r += vm.get_length() * direction.normalized();
+                    node.bounds.min = lr.min(r);
+                    node.bounds.max = lr.max(r);
+                    max = max.max(node.bounds.max);
+                    min = min.min(node.bounds.min);
+                    nodes.push_back(node);
                     break;
+                }
                 case LEFT:
-                    angle -= vm.get_angle();
+                    direction.rotate_in_plane(0, 1, -vm.get_angle());
                     break;
                 case RIGHT:
-                    angle += vm.get_angle();
+                    direction.rotate_in_plane(0, 1, vm.get_angle());
                     break;
                 case UP:
+                    if constexpr (N >= 3) {
+                        direction.rotate_in_plane(0, 2, -vm.get_angle());
+                    }
+                    break;
                 case DOWN:
-                    // 3D action, ignore for now
+                    if constexpr (N >= 3) {
+                        direction.rotate_in_plane(0, 2, vm.get_angle());
+                    }
                     break;
                 case PUSH:
-                    state_stack.push_back({x, y, angle});
+                    state_stack.push_back({r, direction});
                     break;
                 case POP:
                     if (!state_stack.empty()) {
                         State state = state_stack.back();
                         state_stack.pop_back();
-                        x = state.x;
-                        y = state.y;
-                        angle = state.angle;
+                        r = state.position;
+                        direction = state.direction;
                     }
                     break;
             }
         }
-        GenerationResult result;
-        result.cells = std::move(cells);
-        result.bounds = Rect2i(min_x, min_y, max_x - min_x, max_y - min_y);
+        GenerationResult<N> result;
+        result.nodes = std::move(nodes);
+        result.bounds = AABB<float, N>();
+        result.bounds.min = min;
+        result.bounds.max = max;
         return result;
 }
 
+template <size_t N>
+spatial::LBH<N> LSystem::generate() {
+    GenerationResult<N> result = generate_leaf_nodes<N>();
+    // get morton code for each node based on its centroid
+    vec<float, N> size = result.bounds.max - result.bounds.min;
+    for (auto &node : result.nodes) {
+        vec<float, N> centroid = (node.bounds.min + node.bounds.max) * 0.5f;
+        vec<float, N> normalized_centroid;
+        for (std::size_t d = 0; d < N; d++) {
+            const float denom = size[d];
+            normalized_centroid[d] = (denom > 0.0f) ? ((centroid[d] - result.bounds.min[d]) / denom) : 0.5f;
+        }
+        uint32_t morton_code = spatial::morton_code<uint32_t>(normalized_centroid);
+        node.morton_code = morton_code;
+    }
+    // sort leaf nodes by morton code
+    std::sort(result.nodes.begin(), result.nodes.end(), [](const spatial::Node<N>& a, const spatial::Node<N>& b) {
+        return a.morton_code < b.morton_code;
+    });
+    return spatial::build(result.nodes);
+}
+
+godot::Array LSystem::generate_2d() {
+    spatial::LBH<2> lbh = generate<2>();
+    return spatial::lbh_2d_to_gd_array(lbh);
+}
+
+godot::Array LSystem::generate_3d() {
+    spatial::LBH<3> lbh = generate<3>();
+    return spatial::lbh_3d_to_gd_array(lbh);
+}
+
 void LSystem::_bind_methods() {
-    ClassDB::bind_method(D_METHOD("get_mode"), &LSystem::get_mode);
-    ClassDB::bind_method(D_METHOD("set_mode"), &LSystem::set_mode);
-    ADD_PROPERTY(PropertyInfo(Variant::INT, "mode", PROPERTY_HINT_ENUM, "2D,3D"), "set_mode", "get_mode");
     ClassDB::bind_method(D_METHOD("get_axiom"), &LSystem::get_axiom);
     ClassDB::bind_method(D_METHOD("set_axiom"), &LSystem::set_axiom);
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "axiom"), "set_axiom", "get_axiom");
@@ -158,5 +175,6 @@ void LSystem::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_length"), &LSystem::set_length);
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "length"), "set_length", "get_length");
     ClassDB::bind_method(D_METHOD("get_byte_code"), &LSystem::get_byte_code);
-    ClassDB::bind_method(D_METHOD("get_structural_action_count"), &LSystem::get_structural_action_count);
+    ClassDB::bind_method(D_METHOD("generate_2d"), &LSystem::generate_2d);
+    ClassDB::bind_method(D_METHOD("generate_3d"), &LSystem::generate_3d);
 }

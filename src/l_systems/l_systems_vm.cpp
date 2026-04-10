@@ -8,14 +8,6 @@ LSystemVM::LSystemVM() {
 LSystemVM::~LSystemVM() {
 }
 
-Mode LSystemVM::get_mode() {
-    return mode;
-}
-
-void LSystemVM::set_mode(Mode p_mode) {
-    mode = p_mode;
-}
-
 String LSystemVM::get_axiom() {
     return axiom;
 }
@@ -73,52 +65,19 @@ String LSystemVM::iterate() {
     return current_string;
 }
 
-bool is_only_3d_opcode(const String &symbol) {
-    for (int k = 0; k < sizeof(only_3d_opcodes) / sizeof(only_3d_opcodes[0]); k++) {
-        if (symbol == only_3d_opcodes[k]) {
-            return true;
-        }
-    }
-    return false;
-}
-
-bool is_structural_action(const String &symbol) {
-    for (int k = 0; k < sizeof(structural_action_glyphs) / sizeof(structural_action_glyphs[0]); k++) {
-        if (symbol == structural_action_glyphs[k]) {
-            return true;
-        }
-    }
-    return false;
-}
 
 PackedByteArray LSystemVM::generate() {
     String result = iterate();
-    structural_action_count = 0;
     PackedByteArray byte_array;
     byte_array.resize(result.length());
     for (int i = 0; i < result.length(); i++) {
         String symbol = result.substr(i, 1);
         int opcode = 0; // Default to DONE
-        if (mode == Mode::MODE_2D) {
-            for (int j = 0; j < sizeof(opcode_glyphsp) / sizeof(opcode_glyphsp[0]); j++) {
-                if(is_only_3d_opcode(symbol)) {
-                    break;
-                }
-                if (symbol == opcode_glyphsp[j]) {
-                    opcode = j;
-                    break;
-                }
+        for (int j = 0; j < sizeof(opcode_glyphsp) / sizeof(opcode_glyphsp[0]); j++) {
+            if (symbol == opcode_glyphsp[j]) {
+                opcode = j;
+                break;
             }
-        } else if (mode == Mode::MODE_3D) {
-            for (int j = 0; j < sizeof(opcode_glyphsp) / sizeof(opcode_glyphsp[0]); j++) {
-                if (symbol == opcode_glyphsp[j]) {
-                    opcode = j;
-                    break;
-                }
-            }
-        }
-        if (is_structural_action(symbol)) {
-            structural_action_count++;
         }
         byte_array[i] = opcode;
     }

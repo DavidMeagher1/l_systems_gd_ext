@@ -1,7 +1,8 @@
 #pragma once
 #include <godot_cpp/classes/resource.hpp>
 #include "l_systems_vm.h"
-#include "../spatial/qtree/qtree.h"
+#include "../spatial/lbh/lbh.h"
+#include "aabb.h"
 
 namespace l_systems{
     using namespace godot;
@@ -9,17 +10,14 @@ namespace l_systems{
         GDCLASS(LSystem, Resource);
 
         public:
-
+            template <size_t N>
             struct GenerationResult {
-                std::vector<spatial::QCell> cells;
-                Rect2i bounds;
+                spatial::LBH<N> nodes;
+                AABB<float, N> bounds;
             };
 
             LSystem();
-            ~LSystem();
-
-            int get_mode();
-            void set_mode(int p_mode);            
+            ~LSystem();          
 
             String get_axiom();
             void set_axiom(const String &p_axiom);
@@ -38,12 +36,17 @@ namespace l_systems{
 
             PackedByteArray get_byte_code();
 
-            int get_structural_action_count() const;
-
-            GenerationResult generate();
+            godot::Array generate_2d();
+            godot::Array generate_3d();
         
         private:
             LSystemVM vm;
             static void _bind_methods();
+            
+            template <size_t N>
+            GenerationResult<N> generate_leaf_nodes();
+
+            template <size_t N>
+            spatial::LBH<N> generate();
     };
 }

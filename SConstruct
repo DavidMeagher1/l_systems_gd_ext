@@ -16,7 +16,6 @@ sources = [
     "src/register_types.cpp",
     "src/l_systems/l_systems.cpp",
     "src/l_systems/l_systems_vm.cpp",
-    "src/spatial/qtree/qtree.cpp",
 ]
 # XML doc class files for documentation generation.
 doc_data = env.GodotCPPDocData("src/gen/doc_data.gen.cpp", source=[
