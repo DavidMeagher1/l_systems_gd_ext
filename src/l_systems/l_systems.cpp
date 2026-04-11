@@ -1,5 +1,6 @@
 #include "l_systems.h"
 #include "vector.h"
+#include <limits>
 using namespace l_systems;
 
 LSystem::LSystem() {
@@ -15,6 +16,7 @@ String LSystem::get_axiom() {
 
 void LSystem::set_axiom(const String &p_axiom) {
     vm.set_axiom(p_axiom);
+    emit_changed();
 }
 
 TypedDictionary<String,String> LSystem::get_rules() {
@@ -23,6 +25,7 @@ TypedDictionary<String,String> LSystem::get_rules() {
 
 void LSystem::set_rules(const TypedDictionary<String,String> &p_rules) {
     vm.set_rules(p_rules);
+    emit_changed();
 }
 
 int LSystem::get_iterations() {
@@ -31,6 +34,7 @@ int LSystem::get_iterations() {
 
 void LSystem::set_iterations(int p_iterations) {
     vm.set_iterations(p_iterations);
+    emit_changed();
 }
 
 float LSystem::get_angle() {
@@ -39,6 +43,7 @@ float LSystem::get_angle() {
 
 void LSystem::set_angle(float p_angle) {
     vm.set_angle(p_angle);
+    emit_changed();
 }
 
 float LSystem::get_length() {
@@ -47,6 +52,7 @@ float LSystem::get_length() {
 
 void LSystem::set_length(float p_length) {
     vm.set_length(p_length);
+    emit_changed();
 }
 
 PackedByteArray LSystem::get_byte_code() {
@@ -62,11 +68,11 @@ LSystem::GenerationResult<N> LSystem::generate_leaf_nodes() {
 
         PackedByteArray byte_code = vm.generate();
         spatial::LBH<N> nodes;
-        vec<float, N> lr; // last position
-        vec<float, N> r; // current position
-        vec<float, N> min;
-        vec<float, N> max;
-        vec<float, N> direction;
+        vec<float, N> lr = vec<float, N>(0.0f); // last position
+        vec<float, N> r = vec<float, N>(0.0f); // current position
+        vec<float, N> min = vec<float, N>(std::numeric_limits<float>::max());
+        vec<float, N> max = vec<float, N>(std::numeric_limits<float>::lowest());
+        vec<float, N> direction = vec<float, N>(0.0f);
         direction[0] = 1.0f;
         std::vector<State> state_stack;
         for (int i = 0; i < byte_code.size(); i++) {
@@ -82,6 +88,8 @@ LSystem::GenerationResult<N> LSystem::generate_leaf_nodes() {
                 case FORWARD: {
                     lr = r;
                     r += vm.get_length() * direction.normalized();
+                    node.p1 = lr;
+                    node.p2 = r;
                     node.bounds.min = lr.min(r);
                     node.bounds.max = lr.max(r);
                     max = max.max(node.bounds.max);
@@ -134,6 +142,20 @@ spatial::LBH<N> LSystem::generate() {
     }
     // get morton code for each node based on its centroid
     vec<float, N> size = result.bounds.max - result.bounds.min;
+    // float uniform_denom = 0.0f;
+    // vec<float, N> axis_offset = vec<float, N>(0.0f);
+    // for (std::size_t d = 0; d < N; d++) {
+    //     if (size[d] > uniform_denom) {
+    //         uniform_denom = size[d];
+    //     }
+    // }
+    // if (uniform_denom <= 0.0f) {
+    //     uniform_denom = 1.0f;
+    // }
+    // for (std::size_t d = 0; d < N; d++) {
+    //     axis_offset[d] = (uniform_denom - size[d]) * 0.5f / uniform_denom;
+    // }
+
     std::vector<std::pair<uint32_t, spatial::Node<N>>> morton_nodes;
     morton_nodes.reserve(result.nodes.size());
     for (auto &node : result.nodes) {
@@ -144,6 +166,15 @@ spatial::LBH<N> LSystem::generate() {
             normalized_centroid[d] = (denom > 0.0f) ? ((centroid[d] - result.bounds.min[d]) / denom) : 0.5f;
             node.bounds.min[d] = (denom > 0.0f) ? ((node.bounds.min[d] - result.bounds.min[d]) / denom) : 0.0f;
             node.bounds.max[d] = (denom > 0.0f) ? ((node.bounds.max[d] - result.bounds.min[d]) / denom) : 1.0f;
+            node.p1[d] = (denom > 0.0f) ? ((node.p1[d] - result.bounds.min[d]) / denom) : 0.5f;
+            node.p2[d] = (denom > 0.0f) ? ((node.p2[d] - result.bounds.min[d]) / denom) : 0.5f;
+            // const float inv = 1.0f / uniform_denom;
+            // const float off = axis_offset[d];
+            // normalized_centroid[d] = (centroid[d] - result.bounds.min[d]) * inv + off;
+            // node.bounds.min[d] = (node.bounds.min[d] - result.bounds.min[d]) * inv + off;
+            // node.bounds.max[d] = (node.bounds.max[d] - result.bounds.min[d]) * inv + off;
+            // node.p1[d] = (node.p1[d] - result.bounds.min[d]) * inv + off;
+            // node.p2[d] = (node.p2[d] - result.bounds.min[d]) * inv + off;
         }
         uint32_t morton_code = spatial::morton_code<uint32_t>(normalized_centroid);
         morton_nodes.push_back({morton_code, node});

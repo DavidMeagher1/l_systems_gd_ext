@@ -35,6 +35,8 @@ namespace l_systems::spatial {
     template <std::size_t N>
     struct Node {
         AABB<float,N> bounds;
+        vec<float, N> p1;
+        vec<float, N> p2;
         unsigned int left_child = 0;
         unsigned int right_child = 0;
         std::vector<uint8_t> extra_data; // Placeholder for any additional data needed for the node
@@ -48,8 +50,9 @@ namespace l_systems::spatial {
         godot::Array gd_array;
         for (const auto& node : lbh) {
             godot::Dictionary dict;
-            dict["min_bound"] = to_gd_vector2(node.bounds.min);
-            dict["max_bound"] = to_gd_vector2(node.bounds.max);
+            dict["bounds"] = AABB<float, 2>::to_gd_rect2(node.bounds);
+            dict["p1"] = to_gd_vector2(node.p1);
+            dict["p2"] = to_gd_vector2(node.p2);
             dict["left_child"] = node.left_child;
             dict["right_child"] = node.right_child;
             dict["extra_data"] = to_gd_packed_byte_array(node.extra_data);
@@ -62,8 +65,9 @@ namespace l_systems::spatial {
         godot::Array gd_array;
         for (const auto& node : lbh) {
             godot::Dictionary dict;
-            dict["min_bound"] = to_gd_vector3(node.bounds.min);
-            dict["max_bound"] = to_gd_vector3(node.bounds.max);
+            dict["bounds"] = AABB<float, 3>::to_gd_aabb(node.bounds);
+            dict["p1"] = to_gd_vector3(node.p1);
+            dict["p2"] = to_gd_vector3(node.p2);
             dict["left_child"] = node.left_child;
             dict["right_child"] = node.right_child;
             dict["extra_data"] = to_gd_packed_byte_array(node.extra_data);
@@ -108,7 +112,7 @@ namespace l_systems::spatial {
             i -= 2; // Move back two nodes for the next internal node
         }
         return tree;
-    };
+    }
 
     template <std::size_t N>
     std::vector<Node<N>> build_even(const std::vector<Node<N>>& leafs) {
