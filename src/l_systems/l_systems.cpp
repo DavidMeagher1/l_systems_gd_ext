@@ -1,7 +1,13 @@
 #include "l_systems.h"
-#include "vector.h"
+#include "core/vector.h"
 #include <limits>
-using namespace l_systems;
+#include <godot_cpp/variant/utility_functions.hpp>
+
+using namespace procgen;
+using namespace procgen::l_systems;
+using namespace godot;
+
+static void execute_callback(const String &opcode, Node *caller, Dictionary *p_extra_data);
 
 LSystem::LSystem() {
 }
@@ -60,23 +66,25 @@ PackedByteArray LSystem::get_byte_code() {
 }
 
 template <size_t N>
-LSystem::GenerationResult<N> LSystem::generate_leaf_nodes() {
+LSystem::GenerationResult<N> LSystem::generate_leaf_nodes(Node *p_context_node) {
         struct State {
             vec<float, N> position;
             vec<float, N> direction;
+            Dictionary extra_data;
         };
 
         PackedByteArray byte_code = vm.generate();
-        spatial::LBH<N> nodes;
+        lbh::LBH<N> nodes;
         vec<float, N> lr = vec<float, N>(0.0f); // last position
         vec<float, N> r = vec<float, N>(0.0f); // current position
         vec<float, N> min = vec<float, N>(std::numeric_limits<float>::max());
         vec<float, N> max = vec<float, N>(std::numeric_limits<float>::lowest());
         vec<float, N> direction = vec<float, N>(0.0f);
         direction[0] = 1.0f;
+        Dictionary callback_extra_data = data.duplicate(); // Start with initial data, can be modified by callbacks and reset with CLEAR_EXTRA_DATA
         std::vector<State> state_stack;
         for (int i = 0; i < byte_code.size(); i++) {
-            spatial::Node<N> node;
+            lbh::Node<N> node;
             Opcodes opcode = static_cast<Opcodes>(byte_code[i]);
             switch (opcode){
                 case DONE:
@@ -90,6 +98,7 @@ LSystem::GenerationResult<N> LSystem::generate_leaf_nodes() {
                     r += vm.get_length() * direction.normalized();
                     node.p1 = lr;
                     node.p2 = r;
+                    node.extra_data = callback_extra_data.duplicate();
                     node.bounds.min = lr.min(r);
                     node.bounds.max = lr.max(r);
                     max = max.max(node.bounds.max);
@@ -114,7 +123,7 @@ LSystem::GenerationResult<N> LSystem::generate_leaf_nodes() {
                     }
                     break;
                 case PUSH:
-                    state_stack.push_back({r, direction});
+                    state_stack.push_back({r, direction, callback_extra_data.duplicate()});
                     break;
                 case POP:
                     if (!state_stack.empty()) {
@@ -122,9 +131,29 @@ LSystem::GenerationResult<N> LSystem::generate_leaf_nodes() {
                         state_stack.pop_back();
                         r = state.position;
                         direction = state.direction;
+                        callback_extra_data = state.extra_data;
                     }
                     break;
-            }
+                case CALLBACK: {
+                    if (i + 1 >= byte_code.size()) {
+                        UtilityFunctions::printerr("Malformed callback bytecode: missing callback id.");
+                        break;
+                    }
+
+                    const uint8_t callback_id = byte_code[++i];
+                    const String callback_name = vm.get_callback_name_by_id(callback_id);
+                    if (callback_name.is_empty()) {
+                        UtilityFunctions::printerr("Callback id out of range: ", callback_id);
+                        break;
+                    }
+
+                    execute_callback(callback_name, p_context_node, &callback_extra_data);
+                    break;
+                }
+                case CLEAR_EXTRA_DATA:
+                    callback_extra_data = data.duplicate(); // Reset to initial data
+                    break;
+                }
         }
         GenerationResult<N> result;
         result.nodes = std::move(nodes);
@@ -135,8 +164,8 @@ LSystem::GenerationResult<N> LSystem::generate_leaf_nodes() {
 }
 
 template <size_t N>
-spatial::LBH<N> LSystem::generate() {
-    GenerationResult<N> result = generate_leaf_nodes<N>();
+lbh::LBH<N> LSystem::generate(Node *p_context_node) {
+    GenerationResult<N> result = generate_leaf_nodes<N>(p_context_node);
     if (result.nodes.empty()) {
         return {};
     }
@@ -156,7 +185,7 @@ spatial::LBH<N> LSystem::generate() {
     //     axis_offset[d] = (uniform_denom - size[d]) * 0.5f / uniform_denom;
     // }
 
-    std::vector<std::pair<uint32_t, spatial::Node<N>>> morton_nodes;
+    std::vector<std::pair<uint32_t, lbh::Node<N>>> morton_nodes;
     morton_nodes.reserve(result.nodes.size());
     for (auto &node : result.nodes) {
         vec<float, N> centroid = (node.bounds.min + node.bounds.max) * 0.5f;
@@ -176,11 +205,11 @@ spatial::LBH<N> LSystem::generate() {
             // node.p1[d] = (node.p1[d] - result.bounds.min[d]) * inv + off;
             // node.p2[d] = (node.p2[d] - result.bounds.min[d]) * inv + off;
         }
-        uint32_t morton_code = spatial::morton_code<uint32_t>(normalized_centroid);
+        uint32_t morton_code = lbh::morton_code<uint32_t>(normalized_centroid);
         morton_nodes.push_back({morton_code, node});
     }
     // sort leaf nodes by morton code
-    std::sort(morton_nodes.begin(), morton_nodes.end(), [](const std::pair<uint32_t, spatial::Node<N>>& a, const std::pair<uint32_t, spatial::Node<N>>& b) {
+    std::sort(morton_nodes.begin(), morton_nodes.end(), [](const std::pair<uint32_t, lbh::Node<N>>& a, const std::pair<uint32_t, lbh::Node<N>>& b) {
         return a.first < b.first;
     });
 
@@ -188,17 +217,48 @@ spatial::LBH<N> LSystem::generate() {
         result.nodes[i] = std::move(morton_nodes[i].second);
 
     }
-    return spatial::build(result.nodes);
+    return lbh::build(result.nodes);
 }
 
-godot::Array LSystem::generate_2d() {
-    spatial::LBH<2> lbh = generate<2>();
-    return spatial::lbh_2d_to_gd_array(lbh);
+Array LSystem::generate_2d(Node *p_context_node) {
+    lbh::LBH<2> lbh = generate<2>(p_context_node);
+    return lbh::lbh_2d_to_gd_array(lbh);
 }
 
-godot::Array LSystem::generate_3d() {
-    spatial::LBH<3> lbh = generate<3>();
-    return spatial::lbh_3d_to_gd_array(lbh);
+Array LSystem::generate_3d(Node *p_context_node) {
+    lbh::LBH<3> lbh = generate<3>(p_context_node);
+    return lbh::lbh_3d_to_gd_array(lbh);
+}
+
+void LSystem::set_opcode_callbacks(const TypedDictionary<String, String> &p_opcode_callbacks) {
+    vm.set_opcode_callbacks(p_opcode_callbacks);
+}
+
+TypedDictionary<String, String> LSystem::get_opcode_callbacks() {
+    return vm.get_opcode_callbacks();
+}
+
+Dictionary LSystem::get_data() {
+    return data;
+}
+
+void LSystem::set_data(const Dictionary &p_data) {
+    data = p_data;
+    emit_changed();
+}
+
+static void execute_callback(const String &opcode, Node *caller, Dictionary *p_extra_data) {
+    if (caller == nullptr || p_extra_data == nullptr) {
+        return;
+    }
+
+    Callable callback(caller, StringName(opcode));
+    if (!callback.is_valid()) {
+        UtilityFunctions::printerr("Invalid callback method: ", opcode);
+        return;
+    }
+
+    callback.call(*p_extra_data);
 }
 
 void LSystem::_bind_methods() {
@@ -218,6 +278,15 @@ void LSystem::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_length"), &LSystem::set_length);
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "length"), "set_length", "get_length");
     ClassDB::bind_method(D_METHOD("get_byte_code"), &LSystem::get_byte_code);
-    ClassDB::bind_method(D_METHOD("generate_2d"), &LSystem::generate_2d);
-    ClassDB::bind_method(D_METHOD("generate_3d"), &LSystem::generate_3d);
+    ClassDB::bind_method(D_METHOD("generate_2d", "context_node"), &LSystem::generate_2d);
+    ClassDB::bind_method(D_METHOD("generate_3d", "context_node"), &LSystem::generate_3d);
+
+    ClassDB::bind_method(D_METHOD("get_opcode_callbacks"), &LSystem::get_opcode_callbacks);
+    ClassDB::bind_method(D_METHOD("set_opcode_callbacks"), &LSystem::set_opcode_callbacks);
+    ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "opcode_callbacks", PROPERTY_HINT_DICTIONARY_TYPE, "String;String"), "set_opcode_callbacks", "get_opcode_callbacks");
+
+    ClassDB::bind_method(D_METHOD("get_data"), &LSystem::get_data);
+    ClassDB::bind_method(D_METHOD("set_data", "data"), &LSystem::set_data);
+    ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "data"), "set_data", "get_data");
+
 }

@@ -8,9 +8,9 @@
 #include <godot_cpp/godot.hpp>
 
 using namespace godot;
-using namespace l_systems;
+using namespace procgen::l_systems;
 
-void initialize_l_systems_module(ModuleInitializationLevel p_level) {
+void initialize_procgen_module(ModuleInitializationLevel p_level) {
     if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
         return;
     }
@@ -18,17 +18,17 @@ void initialize_l_systems_module(ModuleInitializationLevel p_level) {
     GDREGISTER_CLASS(LSystem);
 }
 
-void uninitialize_l_systems_module(ModuleInitializationLevel p_level) {
+void uninitialize_procgen_module(ModuleInitializationLevel p_level) {
     if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
         return;
     }
 }
 
 extern "C" {
-    GDExtensionBool GDE_EXPORT l_systems_library_init(GDExtensionInterfaceGetProcAddress p_get_proc_address, GDExtensionClassLibraryPtr p_library, GDExtensionInitialization *r_initialization) {
+    GDExtensionBool GDE_EXPORT procgen_library_init(GDExtensionInterfaceGetProcAddress p_get_proc_address, GDExtensionClassLibraryPtr p_library, GDExtensionInitialization *r_initialization) {
         godot::GDExtensionBinding::InitObject init_obj(p_get_proc_address, p_library, r_initialization);
-        init_obj.register_initializer(initialize_l_systems_module);
-        init_obj.register_terminator(uninitialize_l_systems_module);
+        init_obj.register_initializer(initialize_procgen_module);
+        init_obj.register_terminator(uninitialize_procgen_module);
         init_obj.set_minimum_library_initialization_level(MODULE_INITIALIZATION_LEVEL_SCENE);
         return init_obj.init();
     }

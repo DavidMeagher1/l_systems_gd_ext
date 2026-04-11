@@ -5,33 +5,16 @@
 #include "types.h"
 #include <cassert>
 #include <cstdint>
-#include <cstring>
 #include <type_traits>
 #include <utility>
 #include <vector>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
-#include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/variant.hpp>
 
 // Linearly Bounded Hierarchy (LBH) implementation for spatial partitioning
 
-namespace l_systems::spatial {
-    static godot::PackedByteArray to_gd_packed_byte_array(const std::vector<uint8_t> &data) {
-        godot::PackedByteArray bytes;
-        const int64_t size = static_cast<int64_t>(data.size());
-        if (size == 0) {
-            return bytes;
-        }
-
-        if (bytes.resize(size) != 0) {
-            return godot::PackedByteArray();
-        }
-
-        std::memcpy(bytes.ptrw(), data.data(), static_cast<size_t>(size));
-        return bytes;
-    }
-
+namespace procgen::lbh {
     template <std::size_t N>
     struct Node {
         AABB<float,N> bounds;
@@ -39,7 +22,7 @@ namespace l_systems::spatial {
         vec<float, N> p2;
         unsigned int left_child = 0;
         unsigned int right_child = 0;
-        std::vector<uint8_t> extra_data; // Placeholder for any additional data needed for the node
+        godot::Dictionary extra_data; // Optional payload propagated through generation.
     };
 
     // an lbh is just a list of nodes, where the first node is the root
@@ -55,7 +38,7 @@ namespace l_systems::spatial {
             dict["p2"] = to_gd_vector2(node.p2);
             dict["left_child"] = node.left_child;
             dict["right_child"] = node.right_child;
-            dict["extra_data"] = to_gd_packed_byte_array(node.extra_data);
+            dict["extra_data"] = node.extra_data;
             gd_array.append(dict);
         }
         return gd_array;
@@ -70,7 +53,7 @@ namespace l_systems::spatial {
             dict["p2"] = to_gd_vector3(node.p2);
             dict["left_child"] = node.left_child;
             dict["right_child"] = node.right_child;
-            dict["extra_data"] = to_gd_packed_byte_array(node.extra_data);
+            dict["extra_data"] = node.extra_data;
             gd_array.append(dict);
         }
         return gd_array;

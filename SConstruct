@@ -16,7 +16,6 @@ sources = [
     "src/register_types.cpp",
     "src/l_systems/l_systems.cpp",
     "src/l_systems/l_systems_vm.cpp",
-    "src/l_systems/compute_2d.cpp",
 ]
 # XML doc class files for documentation generation.
 doc_data = env.GodotCPPDocData("src/gen/doc_data.gen.cpp", source=[
@@ -30,7 +29,7 @@ sources.append(doc_data)
 # env["suffix"] includes the build's feature tags (e.g. '.windows.template_debug.x86_64')
 # (see https://docs.godotengine.org/en/stable/tutorials/export/feature_tags.html).
 # The final path should match a path in the '.gdextension' file.
-lib_filename = "{}l_systems{}{}".format(env.subst('$SHLIBPREFIX'), env["suffix"], env.subst('$SHLIBSUFFIX'))
+lib_filename = "{}procgen{}{}".format(env.subst('$SHLIBPREFIX'), env["suffix"], env.subst('$SHLIBSUFFIX'))
 
 # Creates a SCons target for the path with our sources.
 library = env.SharedLibrary(
@@ -39,7 +38,7 @@ library = env.SharedLibrary(
 )
 
 # Copy the built library into the test project's addon bin folder.
-addon_bin = "project/l-system-test/addons/l_systems/bin"
+addon_bin = "project/l-system-test/addons/procgen/bin"
 addon_library = env.Install(addon_bin, library)
 
 #NOTE: REMOVE ADDON_LIBRARY AFTER TESTING. THIS IS ONLY FOR CONVENIENCE TO AVOID MANUALLY COPYING THE BUILT LIBRARY INTO THE TEST PROJECT.

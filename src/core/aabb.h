@@ -4,7 +4,7 @@
 #include <limits>
 #include <godot_cpp/variant/rect2.hpp>
 #include <godot_cpp/variant/aabb.hpp>
-namespace l_systems {
+namespace procgen{
     template <typename T, std::size_t N>
     struct AABB {
         static_assert(std::is_arithmetic_v<T>, "AABB scalar type must be arithmetic");

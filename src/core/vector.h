@@ -8,7 +8,7 @@
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 
-namespace l_systems {
+namespace procgen {
     template <typename T, const std::size_t N>
     struct vec {
         static_assert(N > 0, "Size of vector must be greater than 0");

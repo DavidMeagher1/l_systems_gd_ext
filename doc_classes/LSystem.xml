@@ -1,17 +1,78 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="LSystem" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		A Resource-backed L-system definition exposed by the extension.
+		A Resource-backed L-system generator with callback-driven per-segment metadata.
 	</brief_description>
 	<description>
-		[LSystem] is a custom GDExtension class intended to hold L-system data and behavior for use from Godot.
-		Update this file as you add properties, methods, signals, and examples so the editor class reference stays in sync.
+		[LSystem] stores an L-system definition (axiom, rewrite rules, iteration settings) and generates segment data for 2D/3D use.
+
+		Generation supports callback symbols via [member opcode_callbacks]. When a callback symbol is encountered, [LSystem] invokes the mapped method on the context node passed to [method generate_2d] or [method generate_3d].
+
+		Callback payload is a mutable [Dictionary]. The payload starts from [member data], is updated by callbacks, and is copied into each future generated segment as [code]extra_data[/code]. Branching ([code][[/code] and [code]][/code]) preserves/restores payload state along with turtle position/direction.
+
+		Example usage:
+		[codeblock lang=gdscript]
+		@export var l_system: LSystem
+
+		func _ready() -> void:
+			l_system.data = {"thickness": 8.0}
+			l_system.opcode_callbacks = {"T": "taper"}
+			var result = l_system.generate_2d(self)
+
+		func taper(extra_data: Dictionary) -> void:
+			extra_data["thickness"] = max(0.5, float(extra_data.get("thickness", 8.0)) * 0.9)
+		[/codeblock]
+
+		In this example, each [code]T[/code] callback symbol updates [code]thickness[/code] for future generated segments.
 	</description>
 	<tutorials>
 	</tutorials>
 	<methods>
+		<method name="generate_2d">
+			<return type="Array" />
+			<param index="0" name="context_node" type="Node" />
+			<description>
+				Generates 2D hierarchy data and executes callback methods on [param context_node].
+			</description>
+		</method>
+		<method name="generate_3d">
+			<return type="Array" />
+			<param index="0" name="context_node" type="Node" />
+			<description>
+				Generates 3D hierarchy data and executes callback methods on [param context_node].
+			</description>
+		</method>
+		<method name="get_byte_code">
+			<return type="PackedByteArray" />
+			<description>
+				Returns compiled opcode bytecode for the current L-system configuration.
+			</description>
+		</method>
 	</methods>
 	<members>
+		<member name="axiom" type="String" setter="set_axiom" getter="get_axiom">
+			The starting string for L-system expansion.
+		</member>
+		<member name="rules" type="Dictionary" setter="set_rules" getter="get_rules">
+			Rewrite table in [code]String -&gt; String[/code] form.
+		</member>
+		<member name="iterations" type="int" setter="set_iterations" getter="get_iterations">
+			Number of rewrite passes applied to [member axiom].
+		</member>
+		<member name="angle" type="float" setter="set_angle" getter="get_angle">
+			Turn angle in radians used by rotation opcodes.
+		</member>
+		<member name="length" type="float" setter="set_length" getter="get_length">
+			Step length for [code]MOVE[/code] and [code]FORWARD[/code] operations.
+		</member>
+		<member name="opcode_callbacks" type="Dictionary" setter="set_opcode_callbacks" getter="get_opcode_callbacks">
+			Callback symbol table in [code]symbol -&gt; method_name[/code] form.
+			Keys are one-character symbols that appear in the expanded L-system string. Values are method names called on the context node during generation.
+		</member>
+		<member name="data" type="Dictionary" setter="set_data" getter="get_data">
+			Initial callback payload dictionary.
+			This payload is copied into callback state at generation start and then propagated to future segments as [code]extra_data[/code].
+		</member>
 	</members>
 	<signals>
 	</signals>
