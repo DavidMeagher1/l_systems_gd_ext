@@ -129,22 +129,34 @@ LSystem::GenerationResult<N> LSystem::generate_leaf_nodes() {
 template <size_t N>
 spatial::LBH<N> LSystem::generate() {
     GenerationResult<N> result = generate_leaf_nodes<N>();
+    if (result.nodes.empty()) {
+        return {};
+    }
     // get morton code for each node based on its centroid
     vec<float, N> size = result.bounds.max - result.bounds.min;
+    std::vector<std::pair<uint32_t, spatial::Node<N>>> morton_nodes;
+    morton_nodes.reserve(result.nodes.size());
     for (auto &node : result.nodes) {
         vec<float, N> centroid = (node.bounds.min + node.bounds.max) * 0.5f;
         vec<float, N> normalized_centroid;
         for (std::size_t d = 0; d < N; d++) {
             const float denom = size[d];
             normalized_centroid[d] = (denom > 0.0f) ? ((centroid[d] - result.bounds.min[d]) / denom) : 0.5f;
+            node.bounds.min[d] = (denom > 0.0f) ? ((node.bounds.min[d] - result.bounds.min[d]) / denom) : 0.0f;
+            node.bounds.max[d] = (denom > 0.0f) ? ((node.bounds.max[d] - result.bounds.min[d]) / denom) : 1.0f;
         }
         uint32_t morton_code = spatial::morton_code<uint32_t>(normalized_centroid);
-        node.morton_code = morton_code;
+        morton_nodes.push_back({morton_code, node});
     }
     // sort leaf nodes by morton code
-    std::sort(result.nodes.begin(), result.nodes.end(), [](const spatial::Node<N>& a, const spatial::Node<N>& b) {
-        return a.morton_code < b.morton_code;
+    std::sort(morton_nodes.begin(), morton_nodes.end(), [](const std::pair<uint32_t, spatial::Node<N>>& a, const std::pair<uint32_t, spatial::Node<N>>& b) {
+        return a.first < b.first;
     });
+
+    for (size_t i = 0; i < result.nodes.size(); i++) {
+        result.nodes[i] = std::move(morton_nodes[i].second);
+
+    }
     return spatial::build(result.nodes);
 }
 
