@@ -7,7 +7,9 @@ using namespace procgen;
 using namespace procgen::l_systems;
 using namespace godot;
 
-static void execute_callback(const String &opcode, Node *caller, Dictionary *p_extra_data);
+static Dictionary make_l_system_info(LSystem *p_l_system);
+static void sync_l_system_info(Dictionary *p_l_system_info, float *p_angle, float *p_length);
+static void execute_callback(const String &opcode, Dictionary *p_l_system_info, Node *caller, Dictionary *p_extra_data);
 
 LSystem::LSystem() {
 }
@@ -85,6 +87,7 @@ LSystem::GenerationResult<N> LSystem::generate_leaf_nodes(Node *p_context_node) 
         struct State {
             vec<float, N> position;
             vec<float, N> direction;
+            Dictionary l_system_info;
             Dictionary extra_data;
         };
 
@@ -96,6 +99,9 @@ LSystem::GenerationResult<N> LSystem::generate_leaf_nodes(Node *p_context_node) 
         vec<float, N> max = vec<float, N>(std::numeric_limits<float>::lowest());
         vec<float, N> direction = vec<float, N>(0.0f);
         direction[0] = 1.0f;
+        Dictionary callback_l_system_info = make_l_system_info(this);
+        float callback_angle = vm.get_angle();
+        float callback_length = vm.get_length();
         Dictionary callback_extra_data = data.duplicate(); // Start with initial data, can be modified by callbacks and reset with CLEAR_EXTRA_DATA
         std::vector<State> state_stack;
         for (int i = 0; i < byte_code.size(); i++) {
@@ -106,11 +112,11 @@ LSystem::GenerationResult<N> LSystem::generate_leaf_nodes(Node *p_context_node) 
                     break;
                 case MOVE:
                     lr = r;
-                    r += vm.get_length() * direction.normalized();
+                    r += callback_length * direction.normalized();
                     break;
                 case FORWARD: {
                     lr = r;
-                    r += vm.get_length() * direction.normalized();
+                    r += callback_length * direction.normalized();
                     node.p1 = lr;
                     node.p2 = r;
                     node.extra_data = callback_extra_data.duplicate();
@@ -122,23 +128,23 @@ LSystem::GenerationResult<N> LSystem::generate_leaf_nodes(Node *p_context_node) 
                     break;
                 }
                 case LEFT:
-                    direction.rotate_in_plane(0, 1, -vm.get_angle());
+                    direction.rotate_in_plane(0, 1, -callback_angle);
                     break;
                 case RIGHT:
-                    direction.rotate_in_plane(0, 1, vm.get_angle());
+                    direction.rotate_in_plane(0, 1, callback_angle);
                     break;
                 case UP:
                     if constexpr (N >= 3) {
-                        direction.rotate_in_plane(0, 2, -vm.get_angle());
+                        direction.rotate_in_plane(0, 2, -callback_angle);
                     }
                     break;
                 case DOWN:
                     if constexpr (N >= 3) {
-                        direction.rotate_in_plane(0, 2, vm.get_angle());
+                        direction.rotate_in_plane(0, 2, callback_angle);
                     }
                     break;
                 case PUSH:
-                    state_stack.push_back({r, direction, callback_extra_data.duplicate()});
+                    state_stack.push_back({r, direction, callback_l_system_info.duplicate(), callback_extra_data.duplicate()});
                     break;
                 case POP:
                     if (!state_stack.empty()) {
@@ -146,6 +152,8 @@ LSystem::GenerationResult<N> LSystem::generate_leaf_nodes(Node *p_context_node) 
                         state_stack.pop_back();
                         r = state.position;
                         direction = state.direction;
+                        callback_l_system_info = state.l_system_info;
+                        sync_l_system_info(&callback_l_system_info, &callback_angle, &callback_length);
                         callback_extra_data = state.extra_data;
                     }
                     break;
@@ -162,7 +170,8 @@ LSystem::GenerationResult<N> LSystem::generate_leaf_nodes(Node *p_context_node) 
                         break;
                     }
 
-                    execute_callback(callback_name, p_context_node, &callback_extra_data);
+                    execute_callback(callback_name, &callback_l_system_info, p_context_node, &callback_extra_data);
+                    sync_l_system_info(&callback_l_system_info, &callback_angle, &callback_length);
                     break;
                 }
                 case CLEAR_EXTRA_DATA:
@@ -262,8 +271,30 @@ void LSystem::set_data(const Dictionary &p_data) {
     emit_changed();
 }
 
-static void execute_callback(const String &opcode, Node *caller, Dictionary *p_extra_data) {
-    if (caller == nullptr || p_extra_data == nullptr) {
+static Dictionary make_l_system_info(LSystem *p_l_system) {
+    Dictionary info;
+    if (p_l_system == nullptr) {
+        return info;
+    }
+
+    info["angle"] = p_l_system->get_angle();
+    info["length"] = p_l_system->get_length();
+    return info;
+}
+
+static void sync_l_system_info(Dictionary *p_l_system_info, float *p_angle, float *p_length) {
+    if (p_l_system_info == nullptr || p_angle == nullptr || p_length == nullptr) {
+        return;
+    }
+
+    *p_angle = static_cast<float>(p_l_system_info->get("angle", *p_angle));
+    *p_length = static_cast<float>(p_l_system_info->get("length", *p_length));
+    (*p_l_system_info)["angle"] = *p_angle;
+    (*p_l_system_info)["length"] = *p_length;
+}
+
+static void execute_callback(const String &opcode, Dictionary *p_l_system_info, Node *caller, Dictionary *p_extra_data) {
+    if (p_l_system_info == nullptr || caller == nullptr || p_extra_data == nullptr) {
         return;
     }
 
@@ -273,7 +304,7 @@ static void execute_callback(const String &opcode, Node *caller, Dictionary *p_e
         return;
     }
 
-    callback.call(*p_extra_data);
+    callback.call(*p_l_system_info, *p_extra_data);
 }
 
 void LSystem::_bind_methods() {

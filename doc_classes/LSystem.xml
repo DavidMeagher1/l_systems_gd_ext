@@ -6,9 +6,9 @@
 	<description>
 		[LSystem] stores an L-system definition (axiom, rewrite rules, iteration settings) and generates segment data for 2D/3D use.
 
-		Generation supports callback symbols via [member opcode_callbacks]. When a callback symbol is encountered, [LSystem] invokes the mapped method on the context node passed to [method generate_2d] or [method generate_3d].
+		Generation supports callback symbols via [member opcode_callbacks]. When a callback symbol is encountered, [LSystem] invokes the mapped method on the context node passed to [method generate_2d] or [method generate_3d]. Callback methods receive an [code]l_system_info[/code] [Dictionary] with runtime values ([code]length[/code] and [code]angle[/code]) and the mutable payload dictionary. Updating [code]l_system_info.length[/code] or [code]l_system_info.angle[/code] changes subsequent traversal behavior.
 
-		Callback payload is a mutable [Dictionary]. The payload starts from [member data], is updated by callbacks, and is copied into each future generated segment as [code]extra_data[/code]. Branching ([code][[/code] and [code]][/code]) preserves/restores payload state along with turtle position/direction.
+		Callback payload is a mutable [Dictionary]. The payload starts from [member data], is updated by callbacks, and is copied into each future generated segment as [code]extra_data[/code]. Branching ([code][[/code] and [code]][/code]) preserves/restores payload state, [code]l_system_info[/code] values, and turtle position/direction.
 
 		Example usage:
 		[codeblock lang=gdscript]
@@ -19,7 +19,7 @@
 			l_system.opcode_callbacks = {"T": "taper"}
 			var result = l_system.generate_2d(self)
 
-		func taper(extra_data: Dictionary) -> void:
+		func taper(l_system_info: Dictionary, extra_data: Dictionary) -> void:
 			extra_data["thickness"] = max(0.5, float(extra_data.get("thickness", 8.0)) * 0.9)
 		[/codeblock]
 

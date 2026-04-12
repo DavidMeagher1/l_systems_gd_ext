@@ -38,6 +38,9 @@ namespace procgen::l_systems {
             godot::PackedByteArray get_byte_code();
 
             // Generate hierarchy output and execute callback methods on p_context_node.
+            // Callback signature: method_name(l_system_info: Dictionary, extra_data: Dictionary)
+            // l_system_info carries mutable runtime values (currently angle and length).
+            // Changes are applied to following operations and are preserved/restored by PUSH/POP.
             godot::Array generate_2d(godot::Node *p_context_node);
             godot::Array generate_3d(godot::Node *p_context_node);
 
