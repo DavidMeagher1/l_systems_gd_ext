@@ -6,9 +6,11 @@
 	<description>
 		[LSystem] stores an L-system definition (axiom, rewrite rules, iteration settings) and generates segment data for 2D/3D use.
 
-		Generation supports callback symbols via [member opcode_callbacks]. When a callback symbol is encountered, [LSystem] invokes the mapped method on the context node passed to [method generate_2d] or [method generate_3d]. Callback methods receive an [code]l_system_info[/code] [Dictionary] with runtime values ([code]length[/code] and [code]angle[/code]) and the mutable payload dictionary. Updating [code]l_system_info.length[/code] or [code]l_system_info.angle[/code] changes subsequent traversal behavior.
+		Generation supports callback symbols via [member opcode_callbacks]. When a callback symbol is encountered, [LSystem] invokes the mapped method on the context node passed to [method generate_2d] or [method generate_3d]. Callback methods receive an [code]l_system_info[/code] [Dictionary] with runtime values ([code]length[/code], [code]angle[/code], [code]sdf_type[/code], and [code]sdf_width[/code]) and the mutable payload dictionary. Updating [code]l_system_info.length[/code], [code]l_system_info.angle[/code], [code]l_system_info.sdf_type[/code], or [code]l_system_info.sdf_width[/code] changes subsequent traversal behavior.
 
 		Callback payload is a mutable [Dictionary]. The payload starts from [member data], is updated by callbacks, and is copied into each future generated segment as [code]extra_data[/code]. Branching ([code][[/code] and [code]][/code]) preserves/restores payload state, [code]l_system_info[/code] values, and turtle position/direction.
+
+		Generated node dictionaries include [code]bounds[/code], [code]p1[/code], [code]p2[/code], [code]left_child[/code], [code]right_child[/code], [code]extra_data[/code], [code]sdf_type[/code], and [code]sdf_width[/code]. [code]sdf_type[/code] is an integer enum where [code]0 = LINE[/code], [code]1 = ELIPSE[/code], [code]2 = RECTANGLE[/code], [code]3 = CAPSULE[/code], and [code]4 = CYLINDER[/code]. Each generated node takes its [code]sdf_type[/code] and [code]sdf_width[/code] from the current runtime [member sdf_type] and [member sdf_width] values after callback updates. Bounds are expanded conservatively to account for shape thickness.
 
 		Example usage:
 		[codeblock lang=gdscript]
@@ -32,14 +34,14 @@
 			<return type="Array" />
 			<param index="0" name="context_node" type="Node" />
 			<description>
-				Generates 2D hierarchy data and executes callback methods on [param context_node].
+				Generates 2D hierarchy data and executes callback methods on [param context_node]. Returned node dictionaries include [code]sdf_type[/code] and conservatively expanded [code]bounds[/code].
 			</description>
 		</method>
 		<method name="generate_3d">
 			<return type="Array" />
 			<param index="0" name="context_node" type="Node" />
 			<description>
-				Generates 3D hierarchy data and executes callback methods on [param context_node].
+				Generates 3D hierarchy data and executes callback methods on [param context_node]. Returned node dictionaries include [code]sdf_type[/code] and conservatively expanded [code]bounds[/code].
 			</description>
 		</method>
 		<method name="get_byte_code">
@@ -64,6 +66,14 @@
 		</member>
 		<member name="length" type="float" setter="set_length" getter="get_length">
 			Step length for [code]MOVE[/code] and [code]FORWARD[/code] operations.
+		</member>
+		<member name="sdf_type" type="int" setter="set_sdf_type" getter="get_sdf_type">
+			Default runtime shape type for generated segments.
+			Callbacks can update [code]l_system_info.sdf_type[/code] during generation, and the current value is copied onto each generated node as [code]sdf_type[/code].
+		</member>
+		<member name="sdf_width" type="float" setter="set_sdf_width" getter="get_sdf_width">
+			Default runtime shape width for generated segments.
+			Callbacks can update [code]l_system_info.sdf_width[/code] during generation, and the current value is copied onto each generated node as [code]sdf_width[/code].
 		</member>
 		<member name="opcode_callbacks" type="Dictionary" setter="set_opcode_callbacks" getter="get_opcode_callbacks">
 			Callback symbol table in [code]symbol -&gt; method_name[/code] form.

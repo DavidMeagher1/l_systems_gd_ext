@@ -35,12 +35,19 @@ namespace procgen::l_systems {
             float get_length();
             void set_length(float p_length);
 
+            int get_sdf_type();
+            void set_sdf_type(int p_sdf_type);
+
+            float get_sdf_width();
+            void set_sdf_width(float p_sdf_width);
+
             godot::PackedByteArray get_byte_code();
 
             // Generate hierarchy output and execute callback methods on p_context_node.
             // Callback signature: method_name(l_system_info: Dictionary, extra_data: Dictionary)
-            // l_system_info carries mutable runtime values (currently angle and length).
+            // l_system_info carries mutable runtime values (currently angle, length, sdf_type, and sdf_width).
             // Changes are applied to following operations and are preserved/restored by PUSH/POP.
+            // Returned node dictionaries include bounds, p1, p2, sdf_type, sdf_width, extra_data, and child indices.
             godot::Array generate_2d(godot::Node *p_context_node);
             godot::Array generate_3d(godot::Node *p_context_node);
 
@@ -63,5 +70,7 @@ namespace procgen::l_systems {
             lbh::LBH<N> generate(godot::Node *p_context_node);
 
             godot::Dictionary data;
+            lbh::SDFType sdf_type = lbh::SDFType::LINE;
+            float sdf_width = 0.0f;
     };
 }
