@@ -21,6 +21,9 @@ String LSystem::get_axiom() {
 }
 
 void LSystem::set_axiom(const String &p_axiom) {
+    if (p_axiom == vm.get_axiom()) {
+        return;
+    }
     vm.set_axiom(p_axiom);
     emit_changed();
 }
@@ -30,6 +33,9 @@ TypedDictionary<String,String> LSystem::get_rules() {
 }
 
 void LSystem::set_rules(const TypedDictionary<String,String> &p_rules) {
+    if (p_rules == vm.get_rules()) {
+        return;
+    }
     vm.set_rules(p_rules);
     emit_changed();
 }
@@ -39,6 +45,9 @@ int LSystem::get_iterations() {
 }
 
 void LSystem::set_iterations(int p_iterations) {
+    if (p_iterations == vm.get_iterations()) {
+        return;
+    }
     vm.set_iterations(p_iterations);
     emit_changed();
 }
@@ -48,6 +57,9 @@ float LSystem::get_angle() {
 }
 
 void LSystem::set_angle(float p_angle) {
+    if (p_angle == vm.get_angle()) {
+        return;
+    }
     vm.set_angle(p_angle);
     emit_changed();
 }
@@ -57,6 +69,9 @@ float LSystem::get_length() {
 }
 
 void LSystem::set_length(float p_length) {
+    if (p_length == vm.get_length()) {
+        return;
+    }
     vm.set_length(p_length);
     emit_changed();
 }
