@@ -35,12 +35,6 @@ namespace procgen::l_systems {
             float get_length();
             void set_length(float p_length);
 
-            int get_sdf_type();
-            void set_sdf_type(int p_sdf_type);
-
-            float get_sdf_width();
-            void set_sdf_width(float p_sdf_width);
-
             godot::PackedByteArray get_byte_code();
 
             // Generate hierarchy output and execute callback methods on p_context_node.
@@ -70,7 +64,5 @@ namespace procgen::l_systems {
             lbh::LBH<N> generate(godot::Node *p_context_node);
 
             godot::Dictionary data;
-            lbh::SDFType sdf_type = lbh::SDFType::LINE;
-            float sdf_width = 0.0f;
     };
 }

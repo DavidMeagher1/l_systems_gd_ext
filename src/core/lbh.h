@@ -15,13 +15,6 @@
 // Linearly Bounded Hierarchy (LBH) implementation for spatial partitioning
 
 namespace procgen::lbh {
-    enum class SDFType : uint8_t {
-        LINE = 0,
-        ELIPSE = 1,
-        RECTANGLE = 2,
-        CAPSULE = 3,
-        CYLINDER = 4,
-    };
 
     template <std::size_t N>
     struct Node {
@@ -30,8 +23,6 @@ namespace procgen::lbh {
         vec<float, N> p2;
         unsigned int left_child = 0;
         unsigned int right_child = 0;
-        SDFType sdf_type = SDFType::LINE;
-        float sdf_width = 0.0f;
         godot::Dictionary extra_data; // Optional payload propagated through generation.
     };
 
@@ -48,8 +39,6 @@ namespace procgen::lbh {
             dict["p2"] = to_gd_vector2(node.p2);
             dict["left_child"] = node.left_child;
             dict["right_child"] = node.right_child;
-            dict["sdf_type"] = static_cast<int>(node.sdf_type);
-            dict["sdf_width"] = node.sdf_width;
             dict["extra_data"] = node.extra_data;
             gd_array.append(dict);
         }
@@ -65,8 +54,6 @@ namespace procgen::lbh {
             dict["p2"] = to_gd_vector3(node.p2);
             dict["left_child"] = node.left_child;
             dict["right_child"] = node.right_child;
-            dict["sdf_type"] = static_cast<int>(node.sdf_type);
-            dict["sdf_width"] = node.sdf_width;
             dict["extra_data"] = node.extra_data;
             gd_array.append(dict);
         }
@@ -79,7 +66,7 @@ namespace procgen::lbh {
             return {};
         }
         if (leafs.size() % 2 == 1) {
-            return build_odd(leafs);
+             build_odd(leafs);
         } else {
             return build_even(leafs);
         }

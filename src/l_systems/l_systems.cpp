@@ -9,13 +9,7 @@ using namespace procgen::l_systems;
 using namespace godot;
 
 static Dictionary make_l_system_info(LSystem *p_l_system);
-static lbh::SDFType sanitize_sdf_type(int p_sdf_type);
-static float sanitize_sdf_width(float p_sdf_width);
-static void sync_l_system_info(Dictionary *p_l_system_info, float *p_angle, float *p_length, lbh::SDFType *p_sdf_type, float *p_sdf_width);
 static void execute_callback(const String &opcode, Dictionary *p_l_system_info, Node *caller, Dictionary *p_extra_data);
-
-template <size_t N>
-static procgen::AABB<float, N> make_segment_bounds(const vec<float, N> &p_start, const vec<float, N> &p_end, lbh::SDFType p_sdf_type, float p_width);
 
 LSystem::LSystem() {
 }
@@ -84,32 +78,6 @@ void LSystem::set_length(float p_length) {
     emit_changed();
 }
 
-int LSystem::get_sdf_type() {
-    return static_cast<int>(sdf_type);
-}
-
-void LSystem::set_sdf_type(int p_sdf_type) {
-    const lbh::SDFType sanitized_type = sanitize_sdf_type(p_sdf_type);
-    if (sanitized_type == sdf_type) {
-        return;
-    }
-    sdf_type = sanitized_type;
-    emit_changed();
-}
-
-float LSystem::get_sdf_width() {
-    return sdf_width;
-}
-
-void LSystem::set_sdf_width(float p_sdf_width) {
-    const float sanitized_width = sanitize_sdf_width(p_sdf_width);
-    if (sanitized_width == sdf_width) {
-        return;
-    }
-    sdf_width = sanitized_width;
-    emit_changed();
-}
-
 PackedByteArray LSystem::get_byte_code() {
     return vm.generate();
 }
@@ -134,8 +102,6 @@ LSystem::GenerationResult<N> LSystem::generate_leaf_nodes(Node *p_context_node) 
         Dictionary callback_l_system_info = make_l_system_info(this);
         float callback_angle = vm.get_angle();
         float callback_length = vm.get_length();
-        lbh::SDFType callback_sdf_type = sdf_type;
-        float callback_sdf_width = sdf_width;
         Dictionary callback_extra_data = data.duplicate(); // Start with initial data, can be modified by callbacks and reset with CLEAR_EXTRA_DATA
         std::vector<State> state_stack;
         for (int i = 0; i < byte_code.size(); i++) {
@@ -154,11 +120,12 @@ LSystem::GenerationResult<N> LSystem::generate_leaf_nodes(Node *p_context_node) 
                     node.p1 = lr;
                     node.p2 = r;
                     node.extra_data = callback_extra_data.duplicate();
-                    node.sdf_type = callback_sdf_type;
-                    node.sdf_width = callback_sdf_width;
-                    node.bounds = make_segment_bounds(lr, r, node.sdf_type, node.sdf_width);
+                    node.bounds = AABB<float, N>();
+                    node.bounds.expand(lr);
+                    node.bounds.expand(r);
                     max = max.max(node.bounds.max);
                     min = min.min(node.bounds.min);
+                    // should add a call back here to to allow users to modify the node's properties before it's added to the list
                     nodes.push_back(node);
                     break;
                 }
@@ -188,7 +155,8 @@ LSystem::GenerationResult<N> LSystem::generate_leaf_nodes(Node *p_context_node) 
                         r = state.position;
                         direction = state.direction;
                         callback_l_system_info = state.l_system_info;
-                        sync_l_system_info(&callback_l_system_info, &callback_angle, &callback_length, &callback_sdf_type, &callback_sdf_width);
+                        callback_angle = static_cast<float>(callback_l_system_info.get("angle", callback_angle));
+                        callback_length = static_cast<float>(callback_l_system_info.get("length", callback_length));
                         callback_extra_data = state.extra_data;
                     }
                     break;
@@ -206,7 +174,8 @@ LSystem::GenerationResult<N> LSystem::generate_leaf_nodes(Node *p_context_node) 
                     }
 
                     execute_callback(callback_name, &callback_l_system_info, p_context_node, &callback_extra_data);
-                    sync_l_system_info(&callback_l_system_info, &callback_angle, &callback_length, &callback_sdf_type, &callback_sdf_width);
+                    callback_angle = static_cast<float>(callback_l_system_info.get("angle", callback_angle));
+                    callback_length = static_cast<float>(callback_l_system_info.get("length", callback_length));
                     break;
                 }
                 case CLEAR_EXTRA_DATA:
@@ -228,22 +197,7 @@ lbh::LBH<N> LSystem::generate(Node *p_context_node) {
     if (result.nodes.empty()) {
         return {};
     }
-    // get morton code for each node based on its centroid
     vec<float, N> size = result.bounds.max - result.bounds.min;
-    // float uniform_denom = 0.0f;
-    // vec<float, N> axis_offset = vec<float, N>(0.0f);
-    // for (std::size_t d = 0; d < N; d++) {
-    //     if (size[d] > uniform_denom) {
-    //         uniform_denom = size[d];
-    //     }
-    // }
-    // if (uniform_denom <= 0.0f) {
-    //     uniform_denom = 1.0f;
-    // }
-    // for (std::size_t d = 0; d < N; d++) {
-    //     axis_offset[d] = (uniform_denom - size[d]) * 0.5f / uniform_denom;
-    // }
-
     std::vector<std::pair<uint32_t, lbh::Node<N>>> morton_nodes;
     morton_nodes.reserve(result.nodes.size());
     for (auto &node : result.nodes) {
@@ -256,13 +210,6 @@ lbh::LBH<N> LSystem::generate(Node *p_context_node) {
             node.bounds.max[d] = (denom > 0.0f) ? ((node.bounds.max[d] - result.bounds.min[d]) / denom) : 1.0f;
             node.p1[d] = (denom > 0.0f) ? ((node.p1[d] - result.bounds.min[d]) / denom) : 0.5f;
             node.p2[d] = (denom > 0.0f) ? ((node.p2[d] - result.bounds.min[d]) / denom) : 0.5f;
-            // const float inv = 1.0f / uniform_denom;
-            // const float off = axis_offset[d];
-            // normalized_centroid[d] = (centroid[d] - result.bounds.min[d]) * inv + off;
-            // node.bounds.min[d] = (node.bounds.min[d] - result.bounds.min[d]) * inv + off;
-            // node.bounds.max[d] = (node.bounds.max[d] - result.bounds.min[d]) * inv + off;
-            // node.p1[d] = (node.p1[d] - result.bounds.min[d]) * inv + off;
-            // node.p2[d] = (node.p2[d] - result.bounds.min[d]) * inv + off;
         }
         uint32_t morton_code = lbh::morton_code<uint32_t>(normalized_centroid);
         morton_nodes.push_back({morton_code, node});
@@ -281,12 +228,16 @@ lbh::LBH<N> LSystem::generate(Node *p_context_node) {
 
 Array LSystem::generate_2d(Node *p_context_node) {
     lbh::LBH<2> lbh = generate<2>(p_context_node);
-    return lbh::lbh_2d_to_gd_array(lbh);
+    Array gd_array = lbh::lbh_2d_to_gd_array(lbh);
+    emit_signal(StringName("finished"), gd_array);
+    return gd_array;
 }
 
 Array LSystem::generate_3d(Node *p_context_node) {
     lbh::LBH<3> lbh = generate<3>(p_context_node);
-    return lbh::lbh_3d_to_gd_array(lbh);
+    Array gd_array = lbh::lbh_3d_to_gd_array(lbh);
+    emit_signal(StringName("finished"), gd_array);
+    return gd_array;
 }
 
 void LSystem::set_opcode_callbacks(const TypedDictionary<String, String> &p_opcode_callbacks) {
@@ -314,44 +265,7 @@ static Dictionary make_l_system_info(LSystem *p_l_system) {
 
     info["angle"] = p_l_system->get_angle();
     info["length"] = p_l_system->get_length();
-    info["sdf_type"] = p_l_system->get_sdf_type();
-    info["sdf_width"] = p_l_system->get_sdf_width();
     return info;
-}
-
-static lbh::SDFType sanitize_sdf_type(int p_sdf_type) {
-    switch (p_sdf_type) {
-        case static_cast<int>(lbh::SDFType::ELIPSE):
-            return lbh::SDFType::ELIPSE;
-        case static_cast<int>(lbh::SDFType::RECTANGLE):
-            return lbh::SDFType::RECTANGLE;
-        case static_cast<int>(lbh::SDFType::CAPSULE):
-            return lbh::SDFType::CAPSULE;
-        case static_cast<int>(lbh::SDFType::CYLINDER):
-            return lbh::SDFType::CYLINDER;
-        case static_cast<int>(lbh::SDFType::LINE):
-        default:
-            return lbh::SDFType::LINE;
-    }
-}
-
-static float sanitize_sdf_width(float p_sdf_width) {
-    return std::max(p_sdf_width, 0.0f);
-}
-
-static void sync_l_system_info(Dictionary *p_l_system_info, float *p_angle, float *p_length, lbh::SDFType *p_sdf_type, float *p_sdf_width) {
-    if (p_l_system_info == nullptr || p_angle == nullptr || p_length == nullptr || p_sdf_type == nullptr || p_sdf_width == nullptr) {
-        return;
-    }
-
-    *p_angle = static_cast<float>(p_l_system_info->get("angle", *p_angle));
-    *p_length = static_cast<float>(p_l_system_info->get("length", *p_length));
-    *p_sdf_type = sanitize_sdf_type(static_cast<int>(p_l_system_info->get("sdf_type", static_cast<int>(*p_sdf_type))));
-    *p_sdf_width = sanitize_sdf_width(static_cast<float>(p_l_system_info->get("sdf_width", *p_sdf_width)));
-    (*p_l_system_info)["angle"] = *p_angle;
-    (*p_l_system_info)["length"] = *p_length;
-    (*p_l_system_info)["sdf_type"] = static_cast<int>(*p_sdf_type);
-    (*p_l_system_info)["sdf_width"] = *p_sdf_width;
 }
 
 static void execute_callback(const String &opcode, Dictionary *p_l_system_info, Node *caller, Dictionary *p_extra_data) {
@@ -366,34 +280,6 @@ static void execute_callback(const String &opcode, Dictionary *p_l_system_info, 
     }
 
     callback.call(*p_l_system_info, *p_extra_data);
-}
-
-template <size_t N>
-static procgen::AABB<float, N> make_segment_bounds(const vec<float, N> &p_start, const vec<float, N> &p_end, lbh::SDFType p_sdf_type, float p_width) {
-    procgen::AABB<float, N> bounds;
-    bounds.expand(p_start);
-    bounds.expand(p_end);
-
-    switch (p_sdf_type) {
-        case lbh::SDFType::ELIPSE:
-            if (p_width > 0.0f) {
-                // The current 2D ellipse SDF path interprets sdf_width as an ellipse radius scale.
-                bounds.grow(p_width);
-            }
-            break;
-        case lbh::SDFType::LINE:
-        case lbh::SDFType::RECTANGLE:
-        case lbh::SDFType::CAPSULE:
-        case lbh::SDFType::CYLINDER:
-            if (p_width > 0.0f) {
-                bounds.grow(p_width * 0.5f);
-            }
-            break;
-        default:
-            break;
-    }
-
-    return bounds;
 }
 
 void LSystem::_bind_methods() {
@@ -412,12 +298,6 @@ void LSystem::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_length"), &LSystem::get_length);
     ClassDB::bind_method(D_METHOD("set_length"), &LSystem::set_length);
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "length"), "set_length", "get_length");
-    ClassDB::bind_method(D_METHOD("get_sdf_type"), &LSystem::get_sdf_type);
-    ClassDB::bind_method(D_METHOD("set_sdf_type", "sdf_type"), &LSystem::set_sdf_type);
-    ADD_PROPERTY(PropertyInfo(Variant::INT, "sdf_type", PROPERTY_HINT_ENUM, "LINE,ELIPSE,RECTANGLE,CAPSULE,CYLINDER"), "set_sdf_type", "get_sdf_type");
-    ClassDB::bind_method(D_METHOD("get_sdf_width"), &LSystem::get_sdf_width);
-    ClassDB::bind_method(D_METHOD("set_sdf_width", "sdf_width"), &LSystem::set_sdf_width);
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "sdf_width"), "set_sdf_width", "get_sdf_width");
     ClassDB::bind_method(D_METHOD("get_byte_code"), &LSystem::get_byte_code);
     ClassDB::bind_method(D_METHOD("generate_2d", "context_node"), &LSystem::generate_2d);
     ClassDB::bind_method(D_METHOD("generate_3d", "context_node"), &LSystem::generate_3d);
@@ -430,4 +310,5 @@ void LSystem::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_data", "data"), &LSystem::set_data);
     ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "data"), "set_data", "get_data");
 
+    ADD_SIGNAL(MethodInfo("finished", PropertyInfo(Variant::ARRAY, "result")));
 }
